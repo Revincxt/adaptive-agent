@@ -47,4 +47,4 @@ pnpm build
 
 `pnpm test` includes a production build before checking the rendered HTML.
 `pnpm test:pages` additionally exports and verifies the public
-`/adaptive-agent-lab/` artifact used by GitHub Pages.
+`/adaptive-agent/` artifact used by GitHub Pages.

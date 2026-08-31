@@ -30,7 +30,7 @@ test("builds a self-contained root-path Sites artifact", async () => {
     html,
     new RegExp(`property="og:image" content="${canonicalOrigin}/og\\.png"`),
   );
-  assert.doesNotMatch(html, /\/adaptive-agent-lab\/assets\//);
+  assert.doesNotMatch(html, /\/adaptive-agent\/assets\//);
 
   const assetUrls = new Set(html.match(/\/assets\/[^"'\\\s<]+/g) ?? []);
   assert.ok(assetUrls.size >= 5);

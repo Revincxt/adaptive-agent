@@ -7,40 +7,40 @@ test("exports a self-contained GitHub Pages artifact under the repository path",
     new URL("../dist/pages/index.html", import.meta.url),
     "utf8",
   );
-  const pagesBase = "/adaptive-agent-lab/";
+  const pagesBase = "/adaptive-agent/";
 
   assert.match(
     html,
     /<title>Adaptive Agent Lab — Multi-map Replay Explorer<\/title>/i,
   );
-  assert.match(html, /href="\/adaptive-agent-lab\/assets\/[^" ]+\.css"/);
-  assert.match(html, /import\("\/adaptive-agent-lab\/assets\/[^" ]+\.js"\)/);
+  assert.match(html, /href="\/adaptive-agent\/assets\/[^" ]+\.css"/);
+  assert.match(html, /import\("\/adaptive-agent\/assets\/[^" ]+\.js"\)/);
   assert.match(
     html,
-    /href="https:\/\/revincxt\.github\.io\/adaptive-agent-lab\/favicon\.svg"/,
+    /href="https:\/\/revincxt\.github\.io\/adaptive-agent\/favicon\.svg"/,
   );
   assert.match(
     html,
-    /property="og:image" content="https:\/\/revincxt\.github\.io\/adaptive-agent-lab\/og\.png"/,
+    /property="og:image" content="https:\/\/revincxt\.github\.io\/adaptive-agent\/og\.png"/,
   );
   assert.match(
     html,
-    /name="twitter:image" content="https:\/\/revincxt\.github\.io\/adaptive-agent-lab\/og\.png"/,
+    /name="twitter:image" content="https:\/\/revincxt\.github\.io\/adaptive-agent\/og\.png"/,
   );
   assert.match(
     html,
-    /rel="canonical" href="https:\/\/revincxt\.github\.io\/adaptive-agent-lab\/"/,
+    /rel="canonical" href="https:\/\/revincxt\.github\.io\/adaptive-agent\/"/,
   );
   assert.doesNotMatch(
     html,
     /(?:href|src|content)=["']\/(?:assets\/|favicon\.svg|og\.png)/,
   );
   assert.doesNotMatch(html, /import\(["']\/assets\//);
-  assert.doesNotMatch(html, /adaptive-agent-lab\/adaptive-agent-lab/);
+  assert.doesNotMatch(html, /adaptive-agent\/adaptive-agent/);
 
   const assetUrls = new Set(
     html.match(
-      /\/adaptive-agent-lab\/(?:assets\/[^"'\\\s<]+|favicon\.svg|og\.png)/g,
+      /\/adaptive-agent\/(?:assets\/[^"'\\\s<]+|favicon\.svg|og\.png)/g,
     ) ?? [],
   );
   assert.ok(assetUrls.size >= 7);
