@@ -391,7 +391,7 @@ export default function Home() {
         <p className="eyebrow">Adaptive Agent Lab</p>
         <h1>Replay gallery unavailable</h1>
         <p>{error}</p>
-        <a href="https://github.com/Revincxt/adaptive-agent-lab">Open the repository</a>
+        <a href="https://github.com/Revincxt/adaptive-agent">Open the repository</a>
       </main>
     );
   }
@@ -487,7 +487,7 @@ export default function Home() {
         <div className="header-meta">
           <span className="recorded-status"><i /> Recorded demonstrations</span>
           <a href="#method">Method</a>
-          <a href="https://github.com/Revincxt/adaptive-agent-lab">GitHub ↗</a>
+          <a href="https://github.com/Revincxt/adaptive-agent">GitHub ↗</a>
         </div>
       </header>
 
@@ -959,7 +959,7 @@ export default function Home() {
 
           <footer className="app-footer">
             <span>Adaptive Agent Lab · schema v{bundle.schemaVersion}</span>
-            <a href="https://github.com/Revincxt/adaptive-agent-lab">Source, protocol, and reproducibility notes ↗</a>
+            <a href="https://github.com/Revincxt/adaptive-agent">Source, protocol, and reproducibility notes ↗</a>
           </footer>
         </article>
       </div>

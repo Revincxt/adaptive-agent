@@ -1,15 +1,15 @@
 # Adaptive Agent Lab
 
-[![CI](https://github.com/Revincxt/adaptive-agent-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Revincxt/adaptive-agent-lab/actions/workflows/ci.yml)
+[![CI](https://github.com/Revincxt/adaptive-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Revincxt/adaptive-agent/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://www.python.org/)
-[![Live demo](https://img.shields.io/badge/Live_demo-GitHub_Pages-2F81F7.svg?logo=github)](https://revincxt.github.io/adaptive-agent-lab/)
+[![Live demo](https://img.shields.io/badge/Live_demo-GitHub_Pages-2F81F7.svg?logo=github)](https://revincxt.github.io/adaptive-agent/)
 
-[![Adaptive Agent Lab warehouse replay](web/public/og.png)](https://revincxt.github.io/adaptive-agent-lab/)
+[![Adaptive Agent Lab warehouse replay](web/public/og.png)](https://revincxt.github.io/adaptive-agent/)
 
 **A reproducible laboratory for planning, reinforcement learning, and hybrid
 agents in dynamic single-robot warehouse delivery.**
 
-> **[Open the multi-map replay explorer →](https://revincxt.github.io/adaptive-agent-lab/)**
+> **[Open the multi-map replay explorer →](https://revincxt.github.io/adaptive-agent/)**
 > Inspect six controllers across four structured warehouse layouts. Each case
 > is an independent non-confirmatory demonstration, not evidence of an
 > algorithm ranking.
