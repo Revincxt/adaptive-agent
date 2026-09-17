@@ -74,7 +74,6 @@ type DemoBundle = {
   defaultCaseId: string;
   cases: DemoCase[];
 };
-type RouteDirection = "north" | "east" | "south" | "west";
 type RoutePhase = "primary" | "recorded" | "reference";
 type OrderState = "queued" | "ready" | "carried" | "delivered" | "expired";
 
@@ -97,21 +96,68 @@ const eventLabels: Record<Event["kind"], string> = {
 
 const playbackRates = [0.5, 1, 2] as const;
 const routeDisplayColors: Record<string, string> = {
-  planning: "#4f5656",
-  replanning: "#125a55",
-  "q-learning": "#765511",
-  "dyna-q": "#674a88",
-  dqn: "#275f8d",
-  hybrid: "#a34734",
+  planning: "#718095",
+  replanning: "#407dc7",
+  "q-learning": "#b58527",
+  "dyna-q": "#936cc6",
+  dqn: "#cb7651",
+  hybrid: "#168f79",
 };
 const cellKey = (point: Point) => `${point.x}:${point.y}`;
+
+const iconPaths = {
+  grid: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
+  layers: "m12 3 10 6-10 6L2 9l10-6Zm-10 12 10 6 10-6M2 12l10 6 10-6",
+  box: "m12 3 9 5v9l-9 5-9-5V8l9-5Zm0 10v9M3 8l9 5 9-5M7.5 5.5l9 5",
+  clock: "M12 8v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z",
+  route:
+    "M5 17V7a3 3 0 0 1 3-3h8a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h10m-3-3 3 3-3 3M7 19a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z",
+  play: "m9 5 11 7-11 7V5Z",
+  pause: "M8 5v14M16 5v14",
+  back: "m15 5-9 7 9 7M4 5v14",
+  next: "m9 5 9 7-9 7M20 5v14",
+  bolt: "m13 2-9 12h7l-1 8 10-13h-7l1-7Z",
+  check: "m5 12 4 4L19 6",
+  arrow: "M7 17 17 7M7 7h10v10",
+  chart: "M4 3v17h17M8 15v-4M13 15V6M18 15V9",
+  robot:
+    "M8 7h8a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3ZM12 3v4M2 11v5M22 11v5M9 12v1M15 12v1M9 17h6",
+  code: "m8 6-6 6 6 6m8-12 6 6-6 6M14 3l-4 18",
+};
+
+function Icon({
+  name,
+  className = "",
+}: {
+  name: keyof typeof iconPaths;
+  className?: string;
+}) {
+  return (
+    <svg
+      className={`icon ${className}`}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={iconPaths[name]} />
+    </svg>
+  );
+}
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
 function formatNumber(value: number) {
-  return new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(value);
+  return new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(
+    value,
+  );
 }
 
 function formatSigned(value: number) {
@@ -132,8 +178,14 @@ function replayEndTime(
   primary: AgentResult | null,
   reference: AgentResult | null,
 ) {
-  const latestEvent = Math.max(1, ...scenario.events.map((event) => event.time));
-  return Math.min(scenario.horizon, Math.max(endTime(primary), endTime(reference), latestEvent));
+  const latestEvent = Math.max(
+    1,
+    ...scenario.events.map((event) => event.time),
+  );
+  return Math.min(
+    scenario.horizon,
+    Math.max(endTime(primary), endTime(reference), latestEvent),
+  );
 }
 
 function stepAtTime(agent: AgentResult, time: number) {
@@ -156,38 +208,6 @@ function blockedCells(events: Event[], time: number) {
   return cells;
 }
 
-function buildRoute(points: Point[]) {
-  const cells = new Map<string, Set<RouteDirection>>();
-  const ensureCell = (point: Point) => {
-    const key = cellKey(point);
-    if (!cells.has(key)) cells.set(key, new Set<RouteDirection>());
-    return cells.get(key)!;
-  };
-
-  points.forEach((point) => ensureCell(point));
-  for (let index = 1; index < points.length; index += 1) {
-    const from = points[index - 1];
-    const to = points[index];
-    const fromCell = ensureCell(from);
-    const toCell = ensureCell(to);
-
-    if (to.x === from.x + 1 && to.y === from.y) {
-      fromCell.add("east");
-      toCell.add("west");
-    } else if (to.x === from.x - 1 && to.y === from.y) {
-      fromCell.add("west");
-      toCell.add("east");
-    } else if (to.y === from.y + 1 && to.x === from.x) {
-      fromCell.add("south");
-      toCell.add("north");
-    } else if (to.y === from.y - 1 && to.x === from.x) {
-      fromCell.add("north");
-      toCell.add("south");
-    }
-  }
-  return cells;
-}
-
 function RouteLayer({
   points,
   width,
@@ -199,31 +219,21 @@ function RouteLayer({
   height: number;
   phase: RoutePhase;
 }) {
-  const route = buildRoute(points);
   return (
-    <div
+    <svg
       className={`route-layer route-${phase}`}
-      style={{
-        gridTemplateColumns: `repeat(${width}, 1fr)`,
-        gridTemplateRows: `repeat(${height}, 1fr)`,
-      }}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
       aria-hidden="true"
     >
-      {Array.from({ length: width * height }).map((_, index) => {
-        const point = { x: index % width, y: Math.floor(index / width) };
-        const directions = route.get(cellKey(point));
-        return (
-          <span className="route-cell" key={`${phase}-${cellKey(point)}`}>
-            {directions?.size ? <i className="route-node" /> : null}
-            {directions
-              ? Array.from(directions).map((direction) => (
-                  <i className={`route-branch route-${direction}`} key={direction} />
-                ))
-              : null}
-          </span>
-        );
-      })}
-    </div>
+      <polyline
+        points={points
+          .map((point) => `${point.x + 0.5},${point.y + 0.5}`)
+          .join(" ")}
+        fill="none"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
   );
 }
 
@@ -240,16 +250,21 @@ function MapThumbnail({ demoCase }: { demoCase: DemoCase }) {
       }}
       aria-hidden="true"
     >
-      {Array.from({ length: scenario.width * scenario.height }).map((_, index) => {
-        const point = { x: index % scenario.width, y: Math.floor(index / scenario.width) };
-        const key = cellKey(point);
-        return (
-          <i
-            className={`${obstacles.has(key) ? "is-obstacle" : ""} ${chargers.has(key) ? "is-charger" : ""}`}
-            key={key}
-          />
-        );
-      })}
+      {Array.from({ length: scenario.width * scenario.height }).map(
+        (_, index) => {
+          const point = {
+            x: index % scenario.width,
+            y: Math.floor(index / scenario.width),
+          };
+          const key = cellKey(point);
+          return (
+            <i
+              className={`${obstacles.has(key) ? "is-obstacle" : ""} ${chargers.has(key) ? "is-charger" : ""}`}
+              key={key}
+            />
+          );
+        },
+      )}
     </span>
   );
 }
@@ -262,13 +277,15 @@ export default function Home() {
   const [referenceId, setReferenceId] = useState("");
   const [time, setTime] = useState(1);
   const [playing, setPlaying] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState<(typeof playbackRates)[number]>(1);
+  const [playbackRate, setPlaybackRate] =
+    useState<(typeof playbackRates)[number]>(1);
   const [showRecordedRemainder, setShowRecordedRemainder] = useState(false);
 
   useEffect(() => {
     fetch("./demo-data.json")
       .then((response) => {
-        if (!response.ok) throw new Error(`demo gallery returned ${response.status}`);
+        if (!response.ok)
+          throw new Error(`demo gallery returned ${response.status}`);
         return response.json() as Promise<DemoBundle>;
       })
       .then((payload) => {
@@ -279,10 +296,16 @@ export default function Home() {
         ) {
           throw new Error("demo gallery schema is not supported");
         }
-        const requestedCase = new URLSearchParams(window.location.search).get("case");
+        const requestedCase = new URLSearchParams(window.location.search).get(
+          "case",
+        );
         const initialCase =
-          payload.cases.find((candidate) => candidate.caseId === requestedCase) ??
-          payload.cases.find((candidate) => candidate.caseId === payload.defaultCaseId) ??
+          payload.cases.find(
+            (candidate) => candidate.caseId === requestedCase,
+          ) ??
+          payload.cases.find(
+            (candidate) => candidate.caseId === payload.defaultCaseId,
+          ) ??
           payload.cases[0];
         const initialAgent =
           initialCase.agents.find((candidate) => candidate.id === "hybrid") ??
@@ -292,45 +315,58 @@ export default function Home() {
         setAgentId(initialAgent?.id ?? "");
       })
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "could not load demo gallery");
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "could not load demo gallery",
+        );
       });
   }, []);
 
   const selectedCase =
-    bundle?.cases.find((candidate) => candidate.caseId === caseId) ?? bundle?.cases[0] ?? null;
+    bundle?.cases.find((candidate) => candidate.caseId === caseId) ??
+    bundle?.cases[0] ??
+    null;
   const agent =
     selectedCase?.agents.find((candidate) => candidate.id === agentId) ??
     selectedCase?.agents[0] ??
     null;
   const reference =
-    selectedCase?.agents.find((candidate) => candidate.id === referenceId) ?? null;
+    selectedCase?.agents.find((candidate) => candidate.id === referenceId) ??
+    null;
   const scenario = selectedCase?.scenario ?? null;
   const maximumTime = scenario ? replayEndTime(scenario, agent, reference) : 1;
 
   useEffect(() => {
     if (!playing || maximumTime <= 1) return;
-    const timer = window.setInterval(() => {
-      setTime((current) => {
-        if (current >= maximumTime) {
-          setPlaying(false);
-          return current;
-        }
-        return current + 1;
-      });
-    }, Math.round(520 / playbackRate));
+    const timer = window.setInterval(
+      () => {
+        setTime((current) => {
+          if (current >= maximumTime) {
+            setPlaying(false);
+            return current;
+          }
+          return current + 1;
+        });
+      },
+      Math.round(520 / playbackRate),
+    );
     return () => window.clearInterval(timer);
   }, [playing, maximumTime, playbackRate]);
 
   const selectCase = (nextCaseId: string) => {
     if (!bundle) return;
-    const nextCase = bundle.cases.find((candidate) => candidate.caseId === nextCaseId);
+    const nextCase = bundle.cases.find(
+      (candidate) => candidate.caseId === nextCaseId,
+    );
     if (!nextCase) return;
     const nextAgent =
       nextCase.agents.find((candidate) => candidate.id === agentId) ??
       nextCase.agents.find((candidate) => candidate.id === "hybrid") ??
       nextCase.agents[0];
     const nextReference = nextCase.agents.some(
-      (candidate) => candidate.id === referenceId && candidate.id !== nextAgent?.id,
+      (candidate) =>
+        candidate.id === referenceId && candidate.id !== nextAgent?.id,
     )
       ? referenceId
       : "";
@@ -347,23 +383,33 @@ export default function Home() {
 
   const selectAgent = (nextAgentId: string) => {
     if (!selectedCase || !scenario) return;
-    const nextAgent = selectedCase.agents.find((candidate) => candidate.id === nextAgentId);
+    const nextAgent = selectedCase.agents.find(
+      (candidate) => candidate.id === nextAgentId,
+    );
     if (!nextAgent) return;
     const nextReferenceId = nextAgentId === referenceId ? agentId : referenceId;
     const nextReference =
-      selectedCase.agents.find((candidate) => candidate.id === nextReferenceId) ?? null;
+      selectedCase.agents.find(
+        (candidate) => candidate.id === nextReferenceId,
+      ) ?? null;
     setReferenceId(nextReferenceId);
     setAgentId(nextAgentId);
-    setTime((current) => Math.min(current, replayEndTime(scenario, nextAgent, nextReference)));
+    setTime((current) =>
+      Math.min(current, replayEndTime(scenario, nextAgent, nextReference)),
+    );
     setPlaying(false);
   };
 
   const selectReference = (nextReferenceId: string) => {
     if (!selectedCase || !scenario) return;
     const nextReference =
-      selectedCase.agents.find((candidate) => candidate.id === nextReferenceId) ?? null;
+      selectedCase.agents.find(
+        (candidate) => candidate.id === nextReferenceId,
+      ) ?? null;
     setReferenceId(nextReferenceId);
-    setTime((current) => Math.min(current, replayEndTime(scenario, agent, nextReference)));
+    setTime((current) =>
+      Math.min(current, replayEndTime(scenario, agent, nextReference)),
+    );
     setPlaying(false);
   };
 
@@ -378,7 +424,9 @@ export default function Home() {
         <p className="eyebrow">Adaptive Agent Lab</p>
         <h1>Replay gallery unavailable</h1>
         <p>{error}</p>
-        <a href="https://github.com/Revincxt/adaptive-agent">Open the repository</a>
+        <a href="https://github.com/Revincxt/adaptive-agent">
+          Open the repository
+        </a>
       </main>
     );
   }
@@ -386,14 +434,18 @@ export default function Home() {
   if (!bundle || !selectedCase || !scenario || !agent || !agent.trace.length) {
     return (
       <main className="loading-shell" aria-live="polite">
-        <span className="loading-mark" aria-hidden="true">Adaptive Agent Lab</span>
+        <span className="loading-mark" aria-hidden="true">
+          Adaptive Agent Lab
+        </span>
         <p>Loading experiment gallery…</p>
       </main>
     );
   }
 
   const currentStep = stepAtTime(agent, time);
-  const referenceStep = reference?.trace.length ? stepAtTime(reference, time) : null;
+  const referenceStep = reference?.trace.length
+    ? stepAtTime(reference, time)
+    : null;
   const agentEndTime = endTime(agent);
   const referenceEndTime = endTime(reference);
   const primaryAtTerminal = time >= agentEndTime;
@@ -402,19 +454,26 @@ export default function Home() {
   const referencePastEnd = Boolean(reference && time > referenceEndTime);
   const primaryStateTime = Math.min(time, agentEndTime);
   const robotPosition = pointFromTrace(currentStep);
-  const referencePosition = referenceStep ? pointFromTrace(referenceStep) : null;
+  const referencePosition = referenceStep
+    ? pointFromTrace(referenceStep)
+    : null;
   const primaryTravelled = [
     scenario.initialRobot,
     ...agent.trace.filter((step) => step.time <= time).map(pointFromTrace),
   ];
   const primaryRemainder = [
     primaryTravelled.at(-1) ?? scenario.initialRobot,
-    ...agent.trace.filter((step) => step.time > time).slice(0, 20).map(pointFromTrace),
+    ...agent.trace
+      .filter((step) => step.time > time)
+      .slice(0, 20)
+      .map(pointFromTrace),
   ];
   const referenceTravelled = reference
     ? [
         scenario.initialRobot,
-        ...reference.trace.filter((step) => step.time <= time).map(pointFromTrace),
+        ...reference.trace
+          .filter((step) => step.time <= time)
+          .map(pointFromTrace),
       ]
     : [];
   const deliveredOrderIds = new Set(
@@ -430,11 +489,16 @@ export default function Home() {
     0,
     Math.min(100, (currentStep.battery / scenario.batteryCapacity) * 100),
   );
-  const completedPercent = maximumTime > 1 ? ((time - 1) / (maximumTime - 1)) * 100 : 100;
-  const closureCount = scenario.events.filter((event) => event.kind === "cell_blocked").length;
+  const completedPercent =
+    maximumTime > 1 ? ((time - 1) / (maximumTime - 1)) * 100 : 100;
+  const closureCount = scenario.events.filter(
+    (event) => event.kind === "cell_blocked",
+  ).length;
   const activeStyle = {
-    "--agent-color": agent.color,
-    "--reference-color": reference?.color ?? "#667078",
+    "--agent-color": routeDisplayColors[agent.id] ?? agent.color,
+    "--reference-color": reference
+      ? (routeDisplayColors[reference.id] ?? reference.color)
+      : "#718095",
     "--agent-route-color": routeDisplayColors[agent.id] ?? agent.color,
     "--reference-route-color": reference
       ? (routeDisplayColors[reference.id] ?? reference.color)
@@ -450,44 +514,81 @@ export default function Home() {
   };
 
   const orderStates = scenario.orders.map(orderState);
-  const deliveredOrderCount = orderStates.filter((state) => state === "delivered").length;
-  const carriedOrderCount = orderStates.filter((state) => state === "carried").length;
-  const readyOrderCount = orderStates.filter((state) => state === "ready").length;
-  const queuedOrderCount = orderStates.filter((state) => state === "queued").length;
+  const deliveredOrderCount = orderStates.filter(
+    (state) => state === "delivered",
+  ).length;
+  const carriedOrderCount = orderStates.filter(
+    (state) => state === "carried",
+  ).length;
+  const readyOrderCount = orderStates.filter(
+    (state) => state === "ready",
+  ).length;
+  const queuedOrderCount = orderStates.filter(
+    (state) => state === "queued",
+  ).length;
   const stateStatus = primaryAtTerminal
-    ? { label: `Trace complete · t=${agentEndTime}`, tone: "complete" }
+    ? { label: "Trace complete", tone: "complete" }
     : currentStep.violations.length
-      ? { label: `${currentStep.violations.length} constraint flag(s)`, tone: "alert" }
+      ? {
+          label: `${currentStep.violations.length} constraint flag(s)`,
+          tone: "alert",
+        }
       : batteryPercent <= 20
         ? { label: "Low battery", tone: "warning" }
         : { label: "State valid", tone: "ok" };
+  const caseNumber = String(bundle.cases.indexOf(selectedCase) + 1).padStart(
+    2,
+    "0",
+  );
 
   return (
     <main className="app-shell" style={activeStyle}>
       <header className="app-header">
-        <a className="brand" href="#workspace" aria-label="Adaptive Agent Lab home">
-          <span>Adaptive Agent Lab</span><strong>Demo</strong>
+        <a
+          className="brand"
+          href="#workspace"
+          aria-label="Adaptive Agent Lab home"
+        >
+          <span className="brand-mark">
+            <Icon name="layers" />
+          </span>
+          <span className="brand-name">
+            Adaptive<span>Agent Lab</span>
+          </span>
         </a>
         <div className="header-meta">
-          <a href="https://github.com/Revincxt/adaptive-agent">GitHub ↗</a>
+          <span className="header-context">
+            Workspace <span>/</span> Replay explorer
+          </span>
+          <div className="header-actions">
+            <span className="recording-label">
+              <Icon name="clock" />
+              Recorded demo
+            </span>
+            <a href="https://github.com/Revincxt/adaptive-agent">
+              <Icon name="code" />
+              <span>GitHub</span>
+              <Icon name="arrow" />
+            </a>
+          </div>
         </div>
       </header>
 
       <div className="workspace" id="workspace">
-        <aside className="scenario-rail" aria-labelledby="scenario-library-title">
+        <aside
+          className="scenario-rail"
+          aria-labelledby="scenario-library-title"
+        >
           <header className="rail-heading">
             <div>
               <h2 id="scenario-library-title">Scenario library</h2>
             </div>
-            <span>{bundle.cases.length} cases</span>
+            <span>{String(bundle.cases.length).padStart(2, "0")}</span>
           </header>
 
           <div className="scenario-list">
             {bundle.cases.map((candidate, index) => {
               const isSelected = candidate.caseId === selectedCase.caseId;
-              const dynamics = candidate.scenario.events.filter(
-                (event) => event.kind === "cell_blocked",
-              ).length;
               return (
                 <button
                   className={`scenario-option ${isSelected ? "is-selected" : ""}`}
@@ -499,34 +600,70 @@ export default function Home() {
                   <span className="scenario-copy">
                     <small>Case {String(index + 1).padStart(2, "0")}</small>
                     <strong>{candidate.label}</strong>
-                    <span>{candidate.display?.topology ?? "Warehouse layout"}</span>
                     <i>
                       {candidate.scenario.width}×{candidate.scenario.height}
                       <b>·</b>
                       {candidate.scenario.orders.length} orders
-                      <b>·</b>
-                      {dynamics} closures
                     </i>
                   </span>
+                  {isSelected ? (
+                    <span className="case-selected">
+                      <Icon name="check" />
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
           </div>
-
         </aside>
 
         <article className="experiment-view">
           <header className="experiment-heading">
             <div className="heading-row">
               <div>
+                <p className="eyebrow">
+                  <span className="eyebrow-line" />
+                  Scenario {caseNumber}
+                </p>
                 <h1>{selectedCase.label}</h1>
-                <span>{selectedCase.display?.difficulty ?? "Recorded case"}</span>
+                <span className="difficulty-badge">
+                  {selectedCase.display?.difficulty ?? "Recorded case"}
+                </span>
               </div>
               <dl className="case-facts">
-                <div><dt>Grid</dt><dd>{scenario.width} × {scenario.height}</dd></div>
-                <div><dt>Orders</dt><dd>{scenario.orders.length}</dd></div>
-                <div><dt>Closure pairs</dt><dd>{closureCount}</dd></div>
-                <div><dt>Horizon</dt><dd>{scenario.horizon}</dd></div>
+                <div>
+                  <dt>
+                    <Icon name="grid" />
+                    Grid
+                  </dt>
+                  <dd>
+                    {scenario.width} <span>×</span> {scenario.height}
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    <Icon name="box" />
+                    Orders
+                  </dt>
+                  <dd>{String(scenario.orders.length).padStart(2, "0")}</dd>
+                </div>
+                <div>
+                  <dt>
+                    <Icon name="route" />
+                    Closures
+                  </dt>
+                  <dd>{String(closureCount).padStart(2, "0")}</dd>
+                </div>
+                <div>
+                  <dt>
+                    <Icon name="clock" />
+                    Horizon
+                  </dt>
+                  <dd>
+                    {scenario.horizon}
+                    <small>steps</small>
+                  </dd>
+                </div>
               </dl>
             </div>
           </header>
@@ -534,13 +671,33 @@ export default function Home() {
           <section className="replay-section" aria-labelledby="replay-title">
             <div className="control-bar">
               <div className="control-title">
-                <h2 id="replay-title">Replay</h2>
+                <span className="section-icon">
+                  <Icon name="route" />
+                </span>
+                <div>
+                  <h2 id="replay-title">Simulation replay</h2>
+                  <span
+                    className={`playback-status ${playing ? "is-playing" : ""}`}
+                  >
+                    <i />
+                    {playing
+                      ? "Playing"
+                      : primaryAtTerminal
+                        ? "Complete"
+                        : "Paused"}
+                  </span>
+                </div>
               </div>
               <label className="field-control">
                 <span>Primary controller</span>
-                <select value={agent.id} onChange={(event) => selectAgent(event.target.value)}>
+                <select
+                  value={agent.id}
+                  onChange={(event) => selectAgent(event.target.value)}
+                >
                   {selectedCase.agents.map((candidate) => (
-                    <option value={candidate.id} key={candidate.id}>{candidate.label}</option>
+                    <option value={candidate.id} key={candidate.id}>
+                      {candidate.label}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -554,7 +711,9 @@ export default function Home() {
                   {selectedCase.agents
                     .filter((candidate) => candidate.id !== agent.id)
                     .map((candidate) => (
-                      <option value={candidate.id} key={candidate.id}>{candidate.label}</option>
+                      <option value={candidate.id} key={candidate.id}>
+                        {candidate.label}
+                      </option>
                     ))}
                 </select>
               </label>
@@ -562,7 +721,9 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={showRecordedRemainder}
-                  onChange={(event) => setShowRecordedRemainder(event.target.checked)}
+                  onChange={(event) =>
+                    setShowRecordedRemainder(event.target.checked)
+                  }
                 />
                 <span>Future path</span>
               </label>
@@ -571,12 +732,14 @@ export default function Home() {
             <div className="analysis-grid">
               <figure className="map-panel">
                 <header className="panel-heading">
-                  <div>
-                    <span>{selectedCase.display?.topology ?? "Warehouse"}</span>
-                    <strong>t = {time}</strong>
+                  <div className="map-title">
+                    <Icon name="grid" />
+                    <strong>
+                      {selectedCase.display?.topology ?? "Warehouse floor"}
+                    </strong>
                   </div>
                   <div className="time-readout">
-                    <span>episode</span>
+                    <span>step</span>
                     <strong>{String(time).padStart(3, "0")}</strong>
                     <i>/ {maximumTime}</i>
                   </div>
@@ -585,7 +748,9 @@ export default function Home() {
                 <div className="map-stage">
                   <div
                     className="warehouse-map"
-                    style={{ aspectRatio: `${scenario.width} / ${scenario.height}` }}
+                    style={{
+                      aspectRatio: `${scenario.width} / ${scenario.height}`,
+                    }}
                     role="img"
                     aria-label={`${selectedCase.label}, ${scenario.width} by ${scenario.height} warehouse map at time ${time}. Primary robot at column ${robotPosition.x}, row ${robotPosition.y}. ${blocked.size} aisle closures active. ${deliveredOrderCount} orders delivered, ${carriedOrderCount} carried, ${readyOrderCount} ready, and ${queuedOrderCount} queued.`}
                   >
@@ -597,7 +762,9 @@ export default function Home() {
                       }}
                       aria-hidden="true"
                     >
-                      {Array.from({ length: scenario.width * scenario.height }).map((_, index) => {
+                      {Array.from({
+                        length: scenario.width * scenario.height,
+                      }).map((_, index) => {
                         const point = {
                           x: index % scenario.width,
                           y: Math.floor(index / scenario.width),
@@ -611,14 +778,19 @@ export default function Home() {
                         );
                         const isPrimaryRobot = cellKey(robotPosition) === key;
                         const isReferenceRobot =
-                          referencePosition && cellKey(referencePosition) === key;
+                          referencePosition &&
+                          cellKey(referencePosition) === key;
 
                         return (
                           <span
                             className={`map-cell ${obstacleSet.has(key) ? "obstacle" : ""} ${blocked.has(key) ? "blocked" : ""}`}
                             key={key}
                           >
-                            {chargerSet.has(key) ? <span className="charger-marker">C</span> : null}
+                            {chargerSet.has(key) ? (
+                              <span className="charger-marker">
+                                <Icon name="bolt" />
+                              </span>
+                            ) : null}
                             {pickups.map((order) => (
                               <span
                                 className={`order-marker pickup-marker is-${orderState(order)}`}
@@ -635,7 +807,9 @@ export default function Home() {
                                 D{scenario.orders.indexOf(order) + 1}
                               </span>
                             ))}
-                            {blocked.has(key) ? <span className="closure-marker">×</span> : null}
+                            {blocked.has(key) ? (
+                              <span className="closure-marker">×</span>
+                            ) : null}
                             {isReferenceRobot ? (
                               <span
                                 className={`robot-marker reference-robot ${isPrimaryRobot ? "is-overlap" : ""} ${referenceAtTerminal ? "is-trace-complete" : ""}`}
@@ -680,29 +854,77 @@ export default function Home() {
                 </div>
 
                 <div className="map-legend" aria-label="Map legend">
-                  <span><i className="legend-primary" />A · {agent.label}</span>
-                  {reference ? <span><i className="legend-reference" />B · {reference.label}</span> : null}
-                  {showRecordedRemainder ? <span><i className="legend-recorded" />future A · next ≤20</span> : null}
-                  <span><i className="legend-order legend-pickup" />P · pickup</span>
-                  <span><i className="legend-order legend-dropoff" />D · drop-off</span>
-                  <span><i className="legend-charger" />charger</span>
-                  <span><i className="legend-closure" />temporary closure</span>
+                  <span>
+                    <i className="legend-primary" />A · {agent.label}
+                  </span>
+                  {reference ? (
+                    <span>
+                      <i className="legend-reference" />B · {reference.label}
+                    </span>
+                  ) : null}
+                  {showRecordedRemainder ? (
+                    <span>
+                      <i className="legend-recorded" />
+                      future A · next ≤20
+                    </span>
+                  ) : null}
+                  <span>
+                    <i className="legend-order legend-pickup" />P · pickup
+                  </span>
+                  <span>
+                    <i className="legend-order legend-dropoff" />D · drop-off
+                  </span>
+                  <span>
+                    <i className="legend-charger" />
+                    charger
+                  </span>
+                  <span>
+                    <i className="legend-closure" />
+                    temporary closure
+                  </span>
                 </div>
 
                 <div className="replay-controls">
-                  <div className="transport-controls" role="group" aria-label="Replay transport">
-                    <button onClick={() => seek(time - 1)} disabled={time <= 1} aria-label="Previous time step">−1</button>
+                  <div
+                    className="transport-controls"
+                    role="group"
+                    aria-label="Replay transport"
+                  >
+                    <button
+                      onClick={() => seek(time - 1)}
+                      disabled={time <= 1}
+                      aria-label="Previous time step"
+                    >
+                      <Icon name="back" />
+                    </button>
                     <button
                       className="play-button"
                       onClick={() => {
                         if (time >= maximumTime) setTime(1);
                         setPlaying((value) => !value);
                       }}
-                      aria-label={playing ? "Pause replay" : time >= maximumTime ? "Replay from start" : "Play replay"}
+                      aria-label={
+                        playing
+                          ? "Pause replay"
+                          : time >= maximumTime
+                            ? "Replay from start"
+                            : "Play replay"
+                      }
                     >
-                      {playing ? "Pause" : time >= maximumTime ? "Replay" : "Play"}
+                      <Icon name={playing ? "pause" : "play"} />
+                      {playing
+                        ? "Pause"
+                        : time >= maximumTime
+                          ? "Replay"
+                          : "Play"}
                     </button>
-                    <button onClick={() => seek(time + 1)} disabled={time >= maximumTime} aria-label="Next time step">+1</button>
+                    <button
+                      onClick={() => seek(time + 1)}
+                      disabled={time >= maximumTime}
+                      aria-label="Next time step"
+                    >
+                      <Icon name="next" />
+                    </button>
                   </div>
 
                   <div className="timeline-control">
@@ -713,30 +935,47 @@ export default function Home() {
                       min="1"
                       max={maximumTime}
                       value={time}
-                      style={{ "--timeline-progress": `${completedPercent}%` } as CSSProperties}
+                      style={
+                        {
+                          "--timeline-progress": `${completedPercent}%`,
+                        } as CSSProperties
+                      }
                       onChange={(event) => seek(Number(event.target.value))}
                     />
-                    <div className="timeline-events" role="group" aria-label="Scenario event shortcuts">
+                    <div
+                      className="timeline-events"
+                      role="group"
+                      aria-label="Scenario event shortcuts"
+                    >
                       {scenario.events
                         .filter((event) => event.time <= maximumTime)
                         .map((event, index) => (
                           <button
                             key={`${event.kind}-${event.time}-${index}`}
                             className={`timeline-event event-${event.kind}`}
-                            style={{
-                              left: `${((event.time - 1) / Math.max(1, maximumTime - 1)) * 100}%`,
-                              "--event-lane": index % 2,
-                            } as CSSProperties}
+                            style={
+                              {
+                                left: `${((event.time - 1) / Math.max(1, maximumTime - 1)) * 100}%`,
+                                "--event-lane": index % 2,
+                              } as CSSProperties
+                            }
                             onClick={() => seek(event.time)}
                             aria-label={`${eventLabels[event.kind]} at time ${event.time}`}
                             title={`${eventLabels[event.kind]} · t=${event.time}`}
                           />
                         ))}
                     </div>
-                    <div className="timeline-scale"><span>t = 1</span><span>t = {maximumTime}</span></div>
+                    <div className="timeline-scale">
+                      <span>t = 1</span>
+                      <span>t = {maximumTime}</span>
+                    </div>
                   </div>
 
-                  <div className="speed-control" role="group" aria-label="Playback speed">
+                  <div
+                    className="speed-control"
+                    role="group"
+                    aria-label="Playback speed"
+                  >
                     {playbackRates.map((rate) => (
                       <button
                         className={rate === playbackRate ? "is-active" : ""}
@@ -749,43 +988,133 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
-
               </figure>
 
-              <aside className="inspector-panel" aria-labelledby="inspector-title">
+              <aside
+                className="inspector-panel"
+                aria-labelledby="inspector-title"
+              >
                 <header className="inspector-heading">
                   <div>
-                    <span className="agent-dot" />
-                    <div><small>{agent.family}</small><h3 id="inspector-title">{agent.label}</h3></div>
+                    <span className="agent-avatar">
+                      <Icon name="robot" />
+                    </span>
+                    <div>
+                      <small>Primary controller</small>
+                      <h3 id="inspector-title">{agent.label}</h3>
+                    </div>
                   </div>
-                  <span className={`state-badge is-${stateStatus.tone}`}>{stateStatus.label}</span>
+                  <span className={`state-badge is-${stateStatus.tone}`}>
+                    <i />
+                    {stateStatus.label}
+                  </span>
                 </header>
 
                 <section className="state-block">
-                  <h4>{primaryAtTerminal ? `Final state · trace ended at t = ${agentEndTime}` : `State at t = ${time}`}</h4>
+                  <h4>
+                    {primaryAtTerminal
+                      ? `Final state · trace ended at t = ${agentEndTime}`
+                      : `State at t = ${time}`}
+                  </h4>
                   <dl className="state-table">
-                    <div><dt>Position</dt><dd>({robotPosition.x}, {robotPosition.y})</dd></div>
-                    <div><dt>Applied action</dt><dd>{primaryPastEnd ? "—" : (actionLabels[currentStep.action] ?? currentStep.action)}</dd></div>
-                    <div><dt>Payload</dt><dd>{currentStep.carriedOrderId ?? "None"}</dd></div>
-                    <div><dt>{primaryAtTerminal ? "Final return" : "Cumulative return"}</dt><dd>{currentStep.cumulativeReward.toFixed(2)}</dd></div>
+                    <div>
+                      <dt>Position</dt>
+                      <dd>
+                        ({robotPosition.x}, {robotPosition.y})
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Applied action</dt>
+                      <dd>
+                        {primaryPastEnd
+                          ? "—"
+                          : (actionLabels[currentStep.action] ??
+                            currentStep.action)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Payload</dt>
+                      <dd>{currentStep.carriedOrderId ?? "None"}</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {primaryAtTerminal
+                          ? "Final return"
+                          : "Cumulative return"}
+                      </dt>
+                      <dd>{currentStep.cumulativeReward.toFixed(2)}</dd>
+                    </div>
                   </dl>
                 </section>
 
                 <section className="battery-block">
-                  <div><h4>Battery</h4><span>{currentStep.battery} / {scenario.batteryCapacity}</span></div>
-                  <div className="battery-track" role="meter" aria-label="Battery level" aria-valuemin={0} aria-valuemax={scenario.batteryCapacity} aria-valuenow={currentStep.battery}>
+                  <div>
+                    <h4>
+                      <Icon name="bolt" />
+                      Battery
+                    </h4>
+                    <span>
+                      {Math.round(batteryPercent)}
+                      <small>%</small>
+                    </span>
+                  </div>
+                  <div
+                    className={`battery-track ${batteryPercent <= 20 ? "is-low" : ""}`}
+                    role="meter"
+                    aria-label="Battery level"
+                    aria-valuemin={0}
+                    aria-valuemax={scenario.batteryCapacity}
+                    aria-valuenow={currentStep.battery}
+                  >
                     <i style={{ width: `${batteryPercent}%` }} />
                   </div>
+                  <p className="battery-capacity">
+                    {currentStep.battery} / {scenario.batteryCapacity} units
+                  </p>
                 </section>
 
                 <section className="order-block">
                   <h4>Order lifecycle</h4>
                   <div className="order-counts">
-                    <div><strong>{deliveredOrderCount}</strong><span>delivered</span></div>
-                    <div><strong>{carriedOrderCount}</strong><span>carried</span></div>
-                    <div><strong>{readyOrderCount}</strong><span>ready</span></div>
-                    <div><strong>{queuedOrderCount}</strong><span>queued</span></div>
+                    <div className="delivered-count">
+                      <strong>{deliveredOrderCount}</strong>
+                      <span>delivered</span>
+                    </div>
+                    <div>
+                      <strong>{carriedOrderCount}</strong>
+                      <span>carried</span>
+                    </div>
+                    <div>
+                      <strong>{readyOrderCount}</strong>
+                      <span>ready</span>
+                    </div>
+                    <div>
+                      <strong>{queuedOrderCount}</strong>
+                      <span>queued</span>
+                    </div>
                   </div>
+                  <ol className="order-list">
+                    {scenario.orders.map((order, index) => {
+                      const state = orderStates[index];
+                      return (
+                        <li
+                          className={`order-row is-${state}`}
+                          aria-label={`Order ${index + 1}: ${state}`}
+                          key={order.id}
+                        >
+                          <span className="order-number">
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
+                          <span className="order-status">
+                            {state === "delivered" ? (
+                              <Icon name="check" />
+                            ) : null}
+                            {state}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
                 </section>
 
                 {reference && referenceStep && referencePosition ? (
@@ -793,26 +1122,52 @@ export default function Home() {
                     <header>
                       <span className="reference-dot" />
                       <div>
-                        <small>{referenceAtTerminal ? `Trace complete · t=${referenceEndTime}` : "Comparison B"}</small>
+                        <small>
+                          {referenceAtTerminal
+                            ? `Trace complete · t=${referenceEndTime}`
+                            : "Comparison B"}
+                        </small>
                         <strong>{reference.label}</strong>
                       </div>
                     </header>
                     <dl>
-                      <div><dt>Position</dt><dd>({referencePosition.x}, {referencePosition.y})</dd></div>
-                      <div><dt>Action</dt><dd>{referencePastEnd ? "—" : (actionLabels[referenceStep.action] ?? referenceStep.action)}</dd></div>
-                      <div><dt>Battery</dt><dd>{referenceStep.battery}</dd></div>
+                      <div>
+                        <dt>Position</dt>
+                        <dd>
+                          ({referencePosition.x}, {referencePosition.y})
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Action</dt>
+                        <dd>
+                          {referencePastEnd
+                            ? "—"
+                            : (actionLabels[referenceStep.action] ??
+                              referenceStep.action)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Battery</dt>
+                        <dd>{referenceStep.battery}</dd>
+                      </div>
                       <div>
                         <dt>
                           Return Δ A−B
-                          <small>{primaryAtTerminal ? "final" : `t=${time}`} vs {referenceAtTerminal ? "final" : `t=${time}`}</small>
+                          <small>
+                            {primaryAtTerminal ? "final" : `t=${time}`} vs{" "}
+                            {referenceAtTerminal ? "final" : `t=${time}`}
+                          </small>
                         </dt>
-                        <dd>{formatSigned(currentStep.cumulativeReward - referenceStep.cumulativeReward)}</dd>
+                        <dd>
+                          {formatSigned(
+                            currentStep.cumulativeReward -
+                              referenceStep.cumulativeReward,
+                          )}
+                        </dd>
                       </div>
                     </dl>
                   </section>
-                ) : (
-                  <p className="comparison-empty">Select controller B to compare.</p>
-                )}
+                ) : null}
               </aside>
             </div>
           </section>
@@ -820,8 +1175,15 @@ export default function Home() {
           <section className="results-section" aria-labelledby="results-title">
             <header className="section-heading">
               <div>
+                <span className="section-icon">
+                  <Icon name="chart" />
+                </span>
                 <h2 id="results-title">Controller outcomes</h2>
               </div>
+              <span className="section-subtitle">
+                Final episode results <span>·</span>{" "}
+                {selectedCase.agents.length} controllers
+              </span>
             </header>
 
             <div className="results-table-wrap">
@@ -843,24 +1205,70 @@ export default function Home() {
                       key={candidate.id}
                     >
                       <th scope="row">
-                        <i style={{ backgroundColor: candidate.color }} />
-                        <span><strong>{candidate.label}</strong><small>{candidate.family}</small></span>
-                        {candidate.id === agent.id ? <b>A</b> : candidate.id === reference?.id ? <b>B</b> : null}
+                        <button
+                          className="controller-option"
+                          onClick={() => selectAgent(candidate.id)}
+                          aria-label={`Replay ${candidate.label}`}
+                          aria-pressed={candidate.id === agent.id}
+                        >
+                          <i
+                            style={{
+                              backgroundColor:
+                                routeDisplayColors[candidate.id] ??
+                                candidate.color,
+                            }}
+                          />
+                          <span>
+                            <strong>{candidate.label}</strong>
+                            <small>{candidate.family}</small>
+                          </span>
+                          {candidate.id === agent.id ? (
+                            <b>A</b>
+                          ) : candidate.id === reference?.id ? (
+                            <b>B</b>
+                          ) : null}
+                        </button>
                       </th>
                       <td>
-                        <span className="metric-value">{formatPercent(candidate.metrics.weightedOnTimeCompletionRate)}</span>
-                        <span className="metric-track"><i style={{ width: formatPercent(candidate.metrics.weightedOnTimeCompletionRate), backgroundColor: candidate.color }} /></span>
+                        <span className="metric-value">
+                          {formatPercent(
+                            candidate.metrics.weightedOnTimeCompletionRate,
+                          )}
+                        </span>
+                        <span className="metric-track">
+                          <i
+                            style={{
+                              width: formatPercent(
+                                candidate.metrics.weightedOnTimeCompletionRate,
+                              ),
+                              backgroundColor:
+                                routeDisplayColors[candidate.id] ??
+                                candidate.color,
+                            }}
+                          />
+                        </span>
                       </td>
-                      <td>{candidate.metrics.completedOrders}/{candidate.metrics.totalOrders}</td>
+                      <td>
+                        {candidate.metrics.completedOrders}/
+                        {candidate.metrics.totalOrders}
+                      </td>
                       <td>{formatNumber(candidate.metrics.totalReward)}</td>
-                      <td>{candidate.metrics.constraintViolations}</td>
+                      <td>
+                        <span
+                          className={`violation-count ${candidate.metrics.constraintViolations === 0 ? "is-clear" : ""}`}
+                        >
+                          {candidate.metrics.constraintViolations === 0 ? (
+                            <Icon name="check" />
+                          ) : null}
+                          {candidate.metrics.constraintViolations}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </section>
-
         </article>
       </div>
     </main>

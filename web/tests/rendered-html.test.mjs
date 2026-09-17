@@ -106,7 +106,6 @@ test("ships a four-map gallery with six real controller traces per case", async 
   assert.match(page, /selectAgent/);
   assert.match(css, /\.analysis-grid/);
   assert.match(css, /\.warehouse-map/);
-  assert.match(css, /--canvas: #f2f3f1/);
   assert.doesNotMatch(page, /Mission control|Replay online|Floor 07|Figure 1|Interpretation notes/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
 });
