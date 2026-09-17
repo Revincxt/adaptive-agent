@@ -1,10 +1,10 @@
 {
   "defaultCaseId": "rack-maze",
   "trainingEpisodes": {
-    "dqn": 80,
-    "dyna-q": 80,
-    "hybrid": 40,
-    "q-learning": 120
+    "dqn": 120,
+    "dyna-q": 120,
+    "hybrid": 60,
+    "q-learning": 160
   },
   "cases": [
     {
@@ -15,7 +15,7 @@
       "tags": ["rack storage", "dynamic closures", "dense"],
       "display": {
         "topology": "Rack islands",
-        "difficulty": "Moderate"
+        "difficulty": "Advanced"
       },
       "scenario": "../scenarios/medium/maze-warehouse.json"
     },
@@ -27,7 +27,7 @@
       "tags": ["parallel aisles", "long routes", "crossovers"],
       "display": {
         "topology": "Parallel aisles",
-        "difficulty": "Accessible"
+        "difficulty": "Advanced"
       },
       "scenario": "../scenarios/medium/parallel-aisles.json"
     },
@@ -39,7 +39,7 @@
       "tags": ["cross-dock", "transfer spine", "high traffic"],
       "display": {
         "topology": "Cross-dock spine",
-        "difficulty": "Moderate"
+        "difficulty": "Advanced"
       },
       "scenario": "../scenarios/medium/cross-dock.json"
     },
@@ -51,7 +51,7 @@
       "tags": ["serpentine", "long horizon", "bottlenecks"],
       "display": {
         "topology": "Serpentine corridor",
-        "difficulty": "Challenging"
+        "difficulty": "Expert"
       },
       "scenario": "../scenarios/medium/serpentine.json"
     }

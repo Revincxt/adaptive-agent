@@ -299,7 +299,11 @@ class HybridAgent(Agent):
         if not route.reached:
             self._clear_route()
             return Action.WAIT
-        required_battery = route.cost + self.config.battery_reserve
+        required_battery = (
+            route.cost
+            + self._post_service_energy(snapshot, order, service_action)
+            + self.config.battery_reserve
+        )
         if state.robot.battery < required_battery:
             if (
                 state.robot.position in snapshot.map.charging_stations
@@ -344,6 +348,39 @@ class HybridAgent(Agent):
             return None
         _, position, route = min(candidates, key=lambda item: (item[0], item[1]))
         return position, route
+
+    def _post_service_energy(
+        self,
+        snapshot: WarehouseSnapshot,
+        order: Order,
+        service_action: Action,
+    ) -> int:
+        position = order.dropoff if service_action is Action.DROPOFF else order.pickup
+        cost = 0
+        if service_action is Action.PICKUP:
+            delivery = astar_path(
+                snapshot.map,
+                order.pickup,
+                order.dropoff,
+                blocked_cells=snapshot.state.blocked_cells,
+            )
+            if not delivery.reached:
+                return snapshot.battery_capacity + 1
+            cost = delivery.cost
+            position = order.dropoff
+        charger_distances = [
+            route.cost
+            for charger in sorted(snapshot.map.charging_stations)
+            if (
+                route := astar_path(
+                    snapshot.map,
+                    position,
+                    charger,
+                    blocked_cells=snapshot.state.blocked_cells,
+                )
+            ).reached
+        ]
+        return cost + (min(charger_distances) if charger_distances else 0)
 
     def _planned_action(
         self,

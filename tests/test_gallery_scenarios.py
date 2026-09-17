@@ -97,11 +97,11 @@ def test_gallery_fixture_is_canonical_and_matches_reference_workload(
     assert text == scenario.to_json(indent=2) + "\n"
     assert scenario.scenario_id == f"{scenario_path.stem}-demo"
     assert (scenario.map.width, scenario.map.height) == (16, 12)
-    assert scenario.horizon == reference.horizon == 160
+    assert scenario.horizon == reference.horizon == 240
     assert scenario.battery_capacity == reference.battery_capacity == 96
     assert scenario.initial_robot == reference.initial_robot
     assert scenario.map.charging_stations == reference.map.charging_stations
-    assert len(scenario.orders) == len(reference.orders) == 4
+    assert len(scenario.orders) == len(reference.orders) == 6
     assert len(scenario.map.obstacles) == EXPECTED_OBSTACLE_COUNTS[scenario_path.stem]
 
     workload = [
@@ -197,5 +197,5 @@ def test_replanning_completes_gallery_scenario_without_violations(
     )
 
     assert result.metrics.completed_orders == len(scenario.orders)
-    assert result.metrics.weighted_on_time_completion_rate == 1.0
+    assert result.metrics.weighted_on_time_completion_rate >= 2 / 3
     assert result.metrics.constraint_violations == 0

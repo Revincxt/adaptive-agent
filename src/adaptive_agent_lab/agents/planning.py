@@ -104,6 +104,128 @@ def _ordered_available_orders(snapshot: WarehouseSnapshot, position: Position) -
     )
 
 
+def guided_action(snapshot: WarehouseSnapshot) -> Action:
+    """Return a deterministic, goal-directed action for training exploration.
+
+    The guide only uses the public snapshot. Learned agents may mix this action
+    with random exploration while training; evaluation remains policy-only.
+    """
+
+    robot = snapshot.state.robot
+    if robot.carried_order_id is not None:
+        order = snapshot.order_by_id(robot.carried_order_id)
+        target = order.dropoff
+        service_action = Action.DROPOFF
+    else:
+        orders = _ordered_available_orders(snapshot, robot.position)
+        if not orders:
+            if (
+                robot.position in snapshot.map.charging_stations
+                and robot.battery < snapshot.battery_capacity
+            ):
+                return Action.CHARGE
+            return Action.WAIT
+        order = orders[0]
+        target = order.pickup
+        service_action = Action.PICKUP
+
+    route = astar_path(
+        snapshot.map,
+        robot.position,
+        target,
+        blocked_cells=snapshot.state.blocked_cells,
+    )
+    post_service_position = target
+    post_service_cost = 0
+    if robot.carried_order_id is None:
+        delivery = astar_path(
+            snapshot.map,
+            target,
+            order.dropoff,
+            blocked_cells=snapshot.state.blocked_cells,
+        )
+        if delivery.reached:
+            post_service_cost = delivery.cost
+            post_service_position = order.dropoff
+    charger_route = min(
+        (
+            astar_path(
+                snapshot.map,
+                post_service_position,
+                charger,
+                blocked_cells=snapshot.state.blocked_cells,
+            )
+            for charger in snapshot.map.charging_stations
+        ),
+        key=lambda candidate: candidate.cost if candidate.reached else 2**63 - 1,
+        default=None,
+    )
+    required = route.cost + post_service_cost + (
+        charger_route.cost if charger_route is not None and charger_route.reached else 0
+    ) + 1
+    if robot.battery < required:
+        if (
+            robot.position in snapshot.map.charging_stations
+            and robot.battery < snapshot.battery_capacity
+        ):
+            return Action.CHARGE
+        to_charger = min(
+            (
+                astar_path(
+                    snapshot.map,
+                    robot.position,
+                    charger,
+                    blocked_cells=snapshot.state.blocked_cells,
+                )
+                for charger in snapshot.map.charging_stations
+            ),
+            key=lambda candidate: candidate.cost if candidate.reached else 2**63 - 1,
+            default=None,
+        )
+        if (
+            to_charger is not None
+            and to_charger.reached
+            and to_charger.cost <= robot.battery
+            and to_charger.actions
+        ):
+            return to_charger.actions[0]
+        return Action.WAIT
+    if route.actions:
+        return route.actions[0]
+    return service_action if route.reached else Action.WAIT
+
+
+def navigation_progress(
+    snapshot: WarehouseSnapshot,
+    next_snapshot: WarehouseSnapshot,
+) -> int:
+    """Measure one-step shortest-path progress toward the current service goal."""
+
+    if snapshot.state.robot.carried_order_id is not None:
+        target = snapshot.order_by_id(snapshot.state.robot.carried_order_id).dropoff
+    else:
+        orders = _ordered_available_orders(snapshot, snapshot.state.robot.position)
+        if not orders:
+            return 0
+        target = orders[0].pickup
+
+    current = astar_path(
+        snapshot.map,
+        snapshot.state.robot.position,
+        target,
+        blocked_cells=snapshot.state.blocked_cells,
+    )
+    following = astar_path(
+        next_snapshot.map,
+        next_snapshot.state.robot.position,
+        target,
+        blocked_cells=next_snapshot.state.blocked_cells,
+    )
+    if not current.reached or not following.reached:
+        return 0
+    return current.cost - following.cost
+
+
 class OpenLoopPlanningAgent(Agent):
     """Build a nominal plan at reset and never repair it during execution."""
 
@@ -219,7 +341,9 @@ class ReplanningAgent(Agent):
         self._record_plan(route.expanded_nodes)
         if not route.reached:
             return []
-        required = route.cost + self.battery_reserve
+        required = route.cost + self._post_service_energy(
+            snapshot, goal, service_action
+        ) + self.battery_reserve
         if robot.battery < required:
             if robot.position in snapshot.map.charging_stations:
                 return [Action.CHARGE]
@@ -231,11 +355,18 @@ class ReplanningAgent(Agent):
         return [*route.actions, service_action]
 
     def _nearest_charger_route(self, snapshot: WarehouseSnapshot) -> SearchResult | None:
+        return self._nearest_charger_route_from(snapshot, snapshot.state.robot.position)
+
+    def _nearest_charger_route_from(
+        self,
+        snapshot: WarehouseSnapshot,
+        start: Position,
+    ) -> SearchResult | None:
         candidates: list[tuple[int, Position, SearchResult]] = []
         for charger in sorted(snapshot.map.charging_stations):
             route = astar_path(
                 snapshot.map,
-                snapshot.state.robot.position,
+                start,
                 charger,
                 blocked_cells=snapshot.state.blocked_cells,
             )
@@ -245,6 +376,33 @@ class ReplanningAgent(Agent):
             return None
         return min(candidates, key=lambda item: (item[0], item[1]))[2]
 
+    def _post_service_energy(
+        self,
+        snapshot: WarehouseSnapshot,
+        goal: Position,
+        service_action: Action,
+    ) -> int:
+        position = goal
+        cost = 0
+        if service_action is Action.PICKUP:
+            order = next(
+                order
+                for order in _ordered_available_orders(snapshot, goal)
+                if order.pickup == goal
+            )
+            delivery = astar_path(
+                snapshot.map,
+                goal,
+                order.dropoff,
+                blocked_cells=snapshot.state.blocked_cells,
+            )
+            if not delivery.reached:
+                return snapshot.battery_capacity + 1
+            cost += delivery.cost
+            position = order.dropoff
+        charger = self._nearest_charger_route_from(snapshot, position)
+        return cost + (charger.cost if charger is not None else 0)
+
 
 __all__ = [
     "MOVEMENT_ACTIONS",
@@ -252,4 +410,6 @@ __all__ = [
     "ReplanningAgent",
     "SearchResult",
     "astar_path",
+    "guided_action",
+    "navigation_progress",
 ]

@@ -94,7 +94,7 @@ Three derived views are shared across implementations.
 The DQN and hybrid agents use a padded flat vector of length
 
 ```text
-4 * (width * height) + 3 + 12 * max_orders
+4 * (width * height) + 6 + 12 * max_orders
 ```
 
 The four grid channels are:
@@ -104,8 +104,11 @@ The four grid channels are:
 3. current dynamic blockages; and
 4. current robot position.
 
-They are flattened in row-major cell order. The three global features are
-normalized time, normalized battery, and a carrying flag. Each order slot has:
+They are flattened in row-major cell order. The six global features are
+normalized time, normalized battery, a carrying flag, normalized relative
+`x`/`y` offsets to the active service target, and a target-present flag. The
+target is the carried order's drop-off or the highest-priority available
+pickup under the shared deadline ordering. Each order slot has:
 
 - normalized pickup `x` and `y`;
 - normalized drop-off `x` and `y`;
@@ -137,8 +140,10 @@ bins, deadline bins, local-only closure masks, or order-count bins.
 
 The common encoder marks immediately feasible actions. Learning agents use this
 mask for greedy and exploratory selection, while the simulator independently
-validates every action. `wait` is always masked in for a live episode. `charge`
-is masked in only at a charging station when battery is below capacity.
+validates every action. The demo DQN additionally applies a documented bias to
+the goal-directed feasible action; this is why it is labelled goal-guided DQN.
+`wait` is always masked in for a live episode. `charge` is masked in only at a
+charging station when battery is below capacity.
 
 ## Action space
 

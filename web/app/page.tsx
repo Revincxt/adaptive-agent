@@ -22,28 +22,22 @@ type TraceStep = {
   action: string;
   position: [number, number];
   battery: number;
-  reward: number;
   cumulativeReward: number;
   carriedOrderId: string | null;
   deliveredOrderId: string | null;
   violations: string[];
-  eventCount: number;
 };
 type Metrics = {
-  weightedCompletionRate: number;
   weightedOnTimeCompletionRate: number;
   totalReward: number;
   completedOrders: number;
   totalOrders: number;
   constraintViolations: number;
-  decisionTimeMs: number | null;
-  steps: number;
 };
 type AgentResult = {
   id: string;
   label: string;
   family: string;
-  description: string;
   color: string;
   metrics: Metrics;
   planningCalls: number;
@@ -65,25 +59,18 @@ type ScenarioData = {
 };
 type DemoCase = {
   caseId: string;
-  mapId: string;
   label: string;
-  description: string;
-  tags: string[];
   display?: {
     topology?: string;
     difficulty?: string;
     [key: string]: unknown;
   };
-  scenarioFingerprint: string;
   scenario: ScenarioData;
-  trainingEpisodes: Record<string, number>;
   agents: AgentResult[];
 };
 type DemoBundle = {
   schemaVersion: number;
-  generatedAt: string;
   rootSeed: number;
-  verificationStatus: string;
   defaultCaseId: string;
   cases: DemoCase[];
 };
@@ -444,8 +431,6 @@ export default function Home() {
     Math.min(100, (currentStep.battery / scenario.batteryCapacity) * 100),
   );
   const completedPercent = maximumTime > 1 ? ((time - 1) / (maximumTime - 1)) * 100 : 100;
-  const obstacleDensity =
-    scenario.obstacles.length / Math.max(1, scenario.width * scenario.height);
   const closureCount = scenario.events.filter((event) => event.kind === "cell_blocked").length;
   const activeStyle = {
     "--agent-color": agent.color,
@@ -481,12 +466,9 @@ export default function Home() {
     <main className="app-shell" style={activeStyle}>
       <header className="app-header">
         <a className="brand" href="#workspace" aria-label="Adaptive Agent Lab home">
-          <span>Adaptive Agent Lab</span>
-          <strong>Replay Explorer</strong>
+          <span>Adaptive Agent Lab</span><strong>Demo</strong>
         </a>
         <div className="header-meta">
-          <span className="recorded-status"><i /> Recorded demonstrations</span>
-          <a href="#method">Method</a>
           <a href="https://github.com/Revincxt/adaptive-agent">GitHub ↗</a>
         </div>
       </header>
@@ -517,7 +499,7 @@ export default function Home() {
                   <span className="scenario-copy">
                     <small>Case {String(index + 1).padStart(2, "0")}</small>
                     <strong>{candidate.label}</strong>
-                    <span>{candidate.display?.topology ?? candidate.tags[0] ?? "Warehouse layout"}</span>
+                    <span>{candidate.display?.topology ?? "Warehouse layout"}</span>
                     <i>
                       {candidate.scenario.width}×{candidate.scenario.height}
                       <b>·</b>
@@ -531,42 +513,28 @@ export default function Home() {
             })}
           </div>
 
-          <p className="rail-note">
-            Four independent demonstration cases. Controller values are comparable only within the
-            selected case.
-          </p>
         </aside>
 
         <article className="experiment-view">
           <header className="experiment-heading">
-            <div className="case-path">
-              <span>{selectedCase.caseId}</span>
-              <i aria-hidden="true">/</i>
-              <span>{selectedCase.display?.difficulty ?? "Recorded case"}</span>
-            </div>
             <div className="heading-row">
               <div>
                 <h1>{selectedCase.label}</h1>
-                <p>{selectedCase.description}</p>
+                <span>{selectedCase.display?.difficulty ?? "Recorded case"}</span>
               </div>
               <dl className="case-facts">
                 <div><dt>Grid</dt><dd>{scenario.width} × {scenario.height}</dd></div>
-                <div><dt>Obstacle density</dt><dd>{formatPercent(obstacleDensity)}</dd></div>
                 <div><dt>Orders</dt><dd>{scenario.orders.length}</dd></div>
                 <div><dt>Closure pairs</dt><dd>{closureCount}</dd></div>
                 <div><dt>Horizon</dt><dd>{scenario.horizon}</dd></div>
               </dl>
-            </div>
-            <div className="scope-line" role="note">
-              <strong>Scope</strong>
-              <span>{bundle.verificationStatus}. Inspect behavior within a case; do not read these tapes as a benchmark ranking.</span>
             </div>
           </header>
 
           <section className="replay-section" aria-labelledby="replay-title">
             <div className="control-bar">
               <div className="control-title">
-                <h2 id="replay-title">Trajectory and state</h2>
+                <h2 id="replay-title">Replay</h2>
               </div>
               <label className="field-control">
                 <span>Primary controller</span>
@@ -596,7 +564,7 @@ export default function Home() {
                   checked={showRecordedRemainder}
                   onChange={(event) => setShowRecordedRemainder(event.target.checked)}
                 />
-                <span>Show next 20 recorded steps</span>
+                <span>Future path</span>
               </label>
             </div>
 
@@ -604,8 +572,8 @@ export default function Home() {
               <figure className="map-panel">
                 <header className="panel-heading">
                   <div>
-                    <span>{selectedCase.display?.topology ?? "Warehouse topology"}</span>
-                    <strong>Map state at t = {time}</strong>
+                    <span>{selectedCase.display?.topology ?? "Warehouse"}</span>
+                    <strong>t = {time}</strong>
                   </div>
                   <div className="time-readout">
                     <span>episode</span>
@@ -717,7 +685,6 @@ export default function Home() {
                   {showRecordedRemainder ? <span><i className="legend-recorded" />future A · next ≤20</span> : null}
                   <span><i className="legend-order legend-pickup" />P · pickup</span>
                   <span><i className="legend-order legend-dropoff" />D · drop-off</span>
-                  <span><i className="legend-inactive" />faint · inactive order</span>
                   <span><i className="legend-charger" />charger</span>
                   <span><i className="legend-closure" />temporary closure</span>
                 </div>
@@ -783,10 +750,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                <figcaption>
-                  Solid route: executed A trace. Dashed route: synchronized B trace. The optional
-                  dotted line previews at most 20 future steps from A&apos;s recorded tape.
-                </figcaption>
               </figure>
 
               <aside className="inspector-panel" aria-labelledby="inspector-title">
@@ -798,17 +761,13 @@ export default function Home() {
                   <span className={`state-badge is-${stateStatus.tone}`}>{stateStatus.label}</span>
                 </header>
 
-                <p className="agent-description">{agent.description}</p>
-
                 <section className="state-block">
                   <h4>{primaryAtTerminal ? `Final state · trace ended at t = ${agentEndTime}` : `State at t = ${time}`}</h4>
                   <dl className="state-table">
                     <div><dt>Position</dt><dd>({robotPosition.x}, {robotPosition.y})</dd></div>
                     <div><dt>Applied action</dt><dd>{primaryPastEnd ? "—" : (actionLabels[currentStep.action] ?? currentStep.action)}</dd></div>
                     <div><dt>Payload</dt><dd>{currentStep.carriedOrderId ?? "None"}</dd></div>
-                    <div><dt>Step reward</dt><dd>{primaryPastEnd ? "—" : currentStep.reward.toFixed(2)}</dd></div>
                     <div><dt>{primaryAtTerminal ? "Final return" : "Cumulative return"}</dt><dd>{currentStep.cumulativeReward.toFixed(2)}</dd></div>
-                    <div><dt>Observed events</dt><dd>{primaryPastEnd ? "—" : currentStep.eventCount}</dd></div>
                   </dl>
                 </section>
 
@@ -852,7 +811,7 @@ export default function Home() {
                     </dl>
                   </section>
                 ) : (
-                  <p className="comparison-empty">Choose a comparison controller to inspect two traces at the same simulator time.</p>
+                  <p className="comparison-empty">Select controller B to compare.</p>
                 )}
               </aside>
             </div>
@@ -863,7 +822,6 @@ export default function Home() {
               <div>
                 <h2 id="results-title">Controller outcomes</h2>
               </div>
-              <p>Same map, order schedule, and event tape. Values remain descriptive.</p>
             </header>
 
             <div className="results-table-wrap">
@@ -873,11 +831,9 @@ export default function Home() {
                   <tr>
                     <th>Controller</th>
                     <th>On time</th>
-                    <th>Completion</th>
+                    <th>Delivered</th>
                     <th>Return</th>
-                    <th>Steps</th>
                     <th>Violations</th>
-                    <th>Decision timing</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -895,11 +851,9 @@ export default function Home() {
                         <span className="metric-value">{formatPercent(candidate.metrics.weightedOnTimeCompletionRate)}</span>
                         <span className="metric-track"><i style={{ width: formatPercent(candidate.metrics.weightedOnTimeCompletionRate), backgroundColor: candidate.color }} /></span>
                       </td>
-                      <td>{formatPercent(candidate.metrics.weightedCompletionRate)}</td>
+                      <td>{candidate.metrics.completedOrders}/{candidate.metrics.totalOrders}</td>
                       <td>{formatNumber(candidate.metrics.totalReward)}</td>
-                      <td>{candidate.metrics.steps}</td>
                       <td>{candidate.metrics.constraintViolations}</td>
-                      <td>{candidate.metrics.decisionTimeMs === null ? "Not measured" : `${formatNumber(candidate.metrics.decisionTimeMs)} ms`}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -907,60 +861,6 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="supporting-section" id="method">
-            <details>
-              <summary>
-                <span><strong>Environment events</strong><small>{scenario.events.length} recorded events</small></span>
-                <i>+</i>
-              </summary>
-              <div className="details-table-wrap">
-                <table>
-                  <thead><tr><th>Time</th><th>Event</th><th>Object / coordinate</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {scenario.events.map((event, index) => {
-                      const detail =
-                        event.orderId ??
-                        (event.position ? `(${event.position.x}, ${event.position.y})` : "—");
-                      return (
-                        <tr key={`${event.kind}-${event.time}-${index}`}>
-                          <td>t = {event.time}</td>
-                          <td>{eventLabels[event.kind]}</td>
-                          <td>{detail}</td>
-                          <td>{event.time <= time ? "Observed" : "Pending"}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-
-            <details>
-              <summary>
-                <span><strong>Method and provenance</strong><small>Scope, generation, and fingerprint</small></span>
-                <i>+</i>
-              </summary>
-              <div className="provenance-grid">
-                <p>
-                  Each controller is trained and replayed independently for this case. The browser
-                  renders committed simulator transitions; it does not run a live policy. Decision
-                  timing is intentionally not measured in these portable demonstration tapes.
-                </p>
-                <dl>
-                  <div><dt>Case ID</dt><dd>{selectedCase.caseId}</dd></div>
-                  <div><dt>Map ID</dt><dd>{selectedCase.mapId}</dd></div>
-                  <div><dt>Root seed</dt><dd>{bundle.rootSeed}</dd></div>
-                  <div><dt>Generated</dt><dd>{new Date(bundle.generatedAt).toLocaleDateString("en-GB")}</dd></div>
-                  <div><dt>Fingerprint</dt><dd><code>{selectedCase.scenarioFingerprint}</code></dd></div>
-                </dl>
-              </div>
-            </details>
-          </section>
-
-          <footer className="app-footer">
-            <span>Adaptive Agent Lab · schema v{bundle.schemaVersion}</span>
-            <a href="https://github.com/Revincxt/adaptive-agent">Source, protocol, and reproducibility notes ↗</a>
-          </footer>
         </article>
       </div>
     </main>

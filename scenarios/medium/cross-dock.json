@@ -55,11 +55,23 @@
         "order_id": "order-003",
         "position": null,
         "time": 75
+      },
+      {
+        "kind": "order_arrival",
+        "order_id": "order-004",
+        "position": null,
+        "time": 100
+      },
+      {
+        "kind": "order_arrival",
+        "order_id": "order-005",
+        "position": null,
+        "time": 130
       }
     ],
     "schema_version": 1
   },
-  "horizon": 160,
+  "horizon": 240,
   "initial_robot": {
     "battery": 96,
     "carried_order_id": null,
@@ -124,6 +136,34 @@
       },
       "priority": 3.0,
       "release_time": 75
+    },
+    {
+      "deadline": 185,
+      "dropoff": {
+        "x": 13,
+        "y": 11
+      },
+      "order_id": "order-004",
+      "pickup": {
+        "x": 6,
+        "y": 5
+      },
+      "priority": 2.0,
+      "release_time": 100
+    },
+    {
+      "deadline": 230,
+      "dropoff": {
+        "x": 15,
+        "y": 10
+      },
+      "order_id": "order-005",
+      "pickup": {
+        "x": 10,
+        "y": 6
+      },
+      "priority": 3.0,
+      "release_time": 130
     }
   ],
   "scenario_id": "cross-dock-demo",

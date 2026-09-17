@@ -63,7 +63,9 @@ test("ships a four-map gallery with six real controller traces per case", async 
     fingerprints.add(demoCase.scenarioFingerprint);
     assert.equal(scenario.width, 16);
     assert.equal(scenario.height, 12);
-    assert.equal(scenario.horizon, 160);
+    assert.equal(scenario.horizon, 240);
+    assert.equal(scenario.orders.length, 6);
+    assert.equal(scenario.events.length, 9);
     assert.deepEqual(demoCase.agents.map((agent) => agent.id), expectedAgents);
 
     const inBounds = (point) =>
@@ -92,9 +94,9 @@ test("ships a four-map gallery with six real controller traces per case", async 
   assert.match(page, /Applied action/);
   assert.match(page, /return "expired"/);
   assert.match(page, /Compare with/);
-  assert.match(page, /Show next 20 recorded steps/);
+  assert.match(page, /Future path/);
   assert.match(page, /Trace complete/);
-  assert.match(page, /decisionTimeMs === null \? "Not measured"/);
+  assert.doesNotMatch(page, /decisionTimeMs|Method and provenance|Environment events/);
   assert.match(page, /slice\(0, 20\)/);
   assert.match(page, /playbackRates/);
   assert.match(page, /new URLSearchParams\(window\.location\.search\)/);

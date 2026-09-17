@@ -215,6 +215,9 @@ class DQNConfigTests(unittest.TestCase):
             {"epsilon_start": 1.1},
             {"epsilon_end": -0.1},
             {"epsilon_start": 0.2, "epsilon_end": 0.3},
+            {"guidance_bias": -0.1},
+            {"guidance_probability": 1.1},
+            {"progress_reward": -0.1},
         )
         for arguments in invalid_arguments:
             with self.subTest(arguments=arguments), self.assertRaises(ValueError):

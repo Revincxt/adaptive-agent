@@ -50,9 +50,9 @@ AGENT_PRESENTATION: Mapping[str, tuple[str, str, str]] = {
         "Adds seeded simulated updates from a learned deterministic transition model.",
     ),
     "dqn": (
-        "NumPy DQN",
+        "Goal-guided DQN",
         "Deep RL",
-        "Approximates masked primitive action values with a from-scratch multilayer network.",
+        "Combines learned primitive action values with a transparent goal-direction prior.",
     ),
     "hybrid": (
         "Learning + A*",
@@ -89,21 +89,33 @@ def make_demo_agents() -> tuple[Agent, ...]:
     return (
         OpenLoopPlanningAgent(),
         ReplanningAgent(),
-        QLearningAgent(alpha=0.15, epsilon_decay=0.999, epsilon_min=0.05),
+        QLearningAgent(
+            alpha=0.15,
+            epsilon_decay=0.999,
+            epsilon_min=0.05,
+            guidance_probability=0.85,
+            progress_reward=0.12,
+        ),
         DynaQAgent(
             alpha=0.15,
             epsilon_decay=0.998,
             epsilon_min=0.05,
-            planning_steps=20,
+            planning_steps=8,
+            guidance_probability=0.75,
+            progress_reward=0.12,
         ),
         DQNAgent(
             DQNConfig(
-                hidden_sizes=(32, 32),
+                hidden_sizes=(64, 64),
                 batch_size=32,
                 replay_capacity=5_000,
                 warmup_steps=64,
+                update_every=4,
                 target_sync_interval=100,
                 epsilon_decay_steps=5_000,
+                guidance_probability=0.75,
+                guidance_bias=8.0,
+                progress_reward=0.12,
             )
         ),
         HybridAgent(HybridConfig(hidden=(32, 32), epsilon=0.20)),

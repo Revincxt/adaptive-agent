@@ -10,6 +10,7 @@ import numpy as np
 import numpy.typing as npt
 
 from adaptive_agent_lab.agents.base import Agent
+from adaptive_agent_lab.agents.planning import guided_action, navigation_progress
 from adaptive_agent_lab.environment.contracts import Action, Transition, WarehouseSnapshot
 from adaptive_agent_lab.environment.observation import ACTIONS, ObservationEncoder, ObservationSpec
 from adaptive_agent_lab.learning.network import MLPQNetwork
@@ -32,6 +33,9 @@ class DQNConfig:
     epsilon_end: float = 0.05
     epsilon_decay_steps: int = 5_000
     max_grad_norm: float = 10.0
+    guidance_probability: float = 0.0
+    guidance_bias: float = 0.0
+    progress_reward: float = 0.0
 
     def __post_init__(self) -> None:
         if len(self.hidden_sizes) not in (1, 2) or any(size < 1 for size in self.hidden_sizes):
@@ -53,6 +57,12 @@ class DQNConfig:
             raise ValueError("warmup_steps must be non-negative")
         if not 0.0 <= self.epsilon_end <= self.epsilon_start <= 1.0:
             raise ValueError("epsilon values must satisfy 0 <= end <= start <= 1")
+        if not 0.0 <= self.guidance_probability <= 1.0:
+            raise ValueError("guidance_probability must be in [0, 1]")
+        if not np.isfinite(self.guidance_bias) or self.guidance_bias < 0.0:
+            raise ValueError("guidance_bias must be finite and non-negative")
+        if not np.isfinite(self.progress_reward) or self.progress_reward < 0.0:
+            raise ValueError("progress_reward must be finite and non-negative")
 
 
 class DQNAgent(Agent):
@@ -127,11 +137,17 @@ class DQNAgent(Agent):
         valid_indices = np.flatnonzero(mask)
         if valid_indices.size == 0:
             action_index = ACTIONS.index(Action.WAIT)
+        elif explore and self._rng.random() < self.config.guidance_probability:
+            action_index = ACTIONS.index(guided_action(snapshot))
         elif explore and self._rng.random() < self.epsilon:
             action_index = int(self._rng.choice(valid_indices))
         else:
             values = network.predict(vector)
             masked = np.where(mask, values, -np.inf)
+            if self.config.guidance_bias:
+                guide_index = ACTIONS.index(guided_action(snapshot))
+                if mask[guide_index]:
+                    masked[guide_index] += self.config.guidance_bias
             action_index = int(np.argmax(masked))
         self._last_vector = vector
         self._last_mask = mask.copy()
@@ -147,12 +163,19 @@ class DQNAgent(Agent):
         next_snapshot = self._snapshot_with_state(transition.next_state)
         next_vector = encoder.vector(next_snapshot).astype(np.float64)
         next_mask = encoder.action_mask(next_snapshot)
+        reward = transition.reward
+        if transition.action.is_movement and self.config.progress_reward:
+            assert self._template is not None
+            current_snapshot = self._snapshot_with_state(transition.state)
+            reward += self.config.progress_reward * navigation_progress(
+                current_snapshot, next_snapshot
+            )
         if self.learning_enabled:
             replay = self._require_replay()
             replay.add(
                 self._pack(self._last_vector, self._last_mask),
                 self._last_action_index,
-                transition.reward,
+                reward,
                 self._pack(next_vector, next_mask),
                 transition.terminated,
             )
@@ -307,6 +330,13 @@ def config_from_mapping(data: Mapping[str, object]) -> DQNConfig:
             cast(str | int | float, data.get("epsilon_decay_steps", 5_000))
         ),
         max_grad_norm=float(cast(str | int | float, data.get("max_grad_norm", 10.0))),
+        guidance_probability=float(
+            cast(str | int | float, data.get("guidance_probability", 0.0))
+        ),
+        guidance_bias=float(cast(str | int | float, data.get("guidance_bias", 0.0))),
+        progress_reward=float(
+            cast(str | int | float, data.get("progress_reward", 0.0))
+        ),
     )
 
 

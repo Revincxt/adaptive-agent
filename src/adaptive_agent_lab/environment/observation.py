@@ -67,9 +67,9 @@ class ObservationSpec:
 
     @property
     def vector_size(self) -> int:
-        # obstacle, charger, dynamic blockage, and robot channels; three global
-        # scalars; then coordinates/time/priority plus five status bits per order.
-        return 4 * self.cell_count + 3 + 12 * self.max_orders
+        # Four grid channels; six global scalars; then seven order values and
+        # five status bits per padded order slot.
+        return 4 * self.cell_count + 6 + 12 * self.max_orders
 
 
 class ObservationEncoder:
@@ -112,10 +112,17 @@ class ObservationEncoder:
         vector[offset] = snapshot.state.time / self.spec.horizon
         vector[offset + 1] = snapshot.state.robot.battery / self.spec.battery_capacity
         vector[offset + 2] = float(snapshot.state.robot.carried_order_id is not None)
-        offset += 3
 
         width_scale = max(self.spec.width - 1, 1)
         height_scale = max(self.spec.height - 1, 1)
+        target = self._active_target(snapshot)
+        if target is not None:
+            robot = snapshot.state.robot.position
+            vector[offset + 3] = (target.x - robot.x) / (2 * width_scale) + 0.5
+            vector[offset + 4] = (target.y - robot.y) / (2 * height_scale) + 0.5
+            vector[offset + 5] = 1.0
+        offset += 6
+
         for order_index, order in enumerate(snapshot.orders):
             base = offset + 12 * order_index
             vector[base : base + 7] = (
@@ -130,6 +137,30 @@ class ObservationEncoder:
             status_index = STATUS_INDEX[snapshot.state.order_status[order.order_id]]
             vector[base + 7 + status_index] = 1.0
         return vector
+
+    @staticmethod
+    def _active_target(snapshot: WarehouseSnapshot) -> Position | None:
+        carried_id = snapshot.state.robot.carried_order_id
+        if carried_id is not None:
+            return snapshot.order_by_id(carried_id).dropoff
+        available = [
+            order
+            for order in snapshot.orders
+            if snapshot.state.order_status[order.order_id] is OrderStatus.AVAILABLE
+        ]
+        if not available:
+            return None
+        robot = snapshot.state.robot.position
+        order = min(
+            available,
+            key=lambda candidate: (
+                candidate.deadline,
+                -candidate.priority,
+                robot.manhattan_distance(candidate.pickup),
+                candidate.order_id,
+            ),
+        )
+        return order.pickup
 
     def tabular(self, snapshot: WarehouseSnapshot) -> TabularState:
         """Return an exact hashable state for controlled small-map experiments."""

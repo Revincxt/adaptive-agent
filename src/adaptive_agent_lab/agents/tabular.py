@@ -11,6 +11,7 @@ from typing import TypeAlias, cast
 import numpy as np
 
 from adaptive_agent_lab.agents.base import Agent
+from adaptive_agent_lab.agents.planning import guided_action, navigation_progress
 from adaptive_agent_lab.environment.contracts import (
     Action,
     Order,
@@ -69,6 +70,8 @@ class QLearningAgent(Agent):
         epsilon: float = 1.0,
         epsilon_decay: float = 0.995,
         epsilon_min: float = 0.05,
+        guidance_probability: float = 0.0,
+        progress_reward: float = 0.0,
     ) -> None:
         super().__init__()
         self.alpha = _probability("alpha", alpha, positive=True)
@@ -78,6 +81,12 @@ class QLearningAgent(Agent):
             "epsilon_decay", epsilon_decay, positive=True
         )
         self.epsilon_min = _probability("epsilon_min", epsilon_min)
+        self.guidance_probability = _probability(
+            "guidance_probability", guidance_probability
+        )
+        if not math.isfinite(progress_reward) or progress_reward < 0.0:
+            raise ValueError("progress_reward must be finite and non-negative")
+        self.progress_reward = float(progress_reward)
         if self.epsilon_min > self.epsilon_initial:
             raise ValueError("epsilon_min cannot exceed epsilon")
 
@@ -160,6 +169,8 @@ class QLearningAgent(Agent):
         feasible = tuple(int(index) for index in np.flatnonzero(mask))
         if not feasible:
             action = Action.WAIT
+        elif explore and self._rng.random() < self.guidance_probability:
+            action = guided_action(snapshot)
         elif explore and self._rng.random() < self._epsilon:
             action = ACTIONS[int(self._rng.choice(feasible))]
         else:
@@ -201,10 +212,15 @@ class QLearningAgent(Agent):
         encoder = self._require_encoder()
         next_snapshot = self._snapshot_for(transition.next_state)
         next_mask = encoder.action_mask(next_snapshot)
+        reward = transition.reward
+        if cached_action.is_movement and self.progress_reward:
+            reward += self.progress_reward * navigation_progress(
+                cached_snapshot, next_snapshot
+            )
         return _Experience(
             state=encoder.tabular(cached_snapshot),
             action_index=ACTION_INDEX[cached_action],
-            reward=transition.reward,
+            reward=reward,
             next_state=encoder.tabular(next_snapshot),
             terminated=transition.terminated,
             next_actions=tuple(int(index) for index in np.flatnonzero(next_mask)),
@@ -249,6 +265,8 @@ class QLearningAgent(Agent):
             "epsilon_initial": self.epsilon_initial,
             "epsilon_min": self.epsilon_min,
             "gamma": self.gamma,
+            "guidance_probability": self.guidance_probability,
+            "progress_reward": self.progress_reward,
         }
 
     def state_dict(self) -> dict[str, object]:
@@ -355,6 +373,8 @@ class DynaQAgent(QLearningAgent):
         epsilon: float = 1.0,
         epsilon_decay: float = 0.995,
         epsilon_min: float = 0.05,
+        guidance_probability: float = 0.0,
+        progress_reward: float = 0.0,
         planning_steps: int = 10,
     ) -> None:
         super().__init__(
@@ -363,6 +383,8 @@ class DynaQAgent(QLearningAgent):
             epsilon=epsilon,
             epsilon_decay=epsilon_decay,
             epsilon_min=epsilon_min,
+            guidance_probability=guidance_probability,
+            progress_reward=progress_reward,
         )
         if isinstance(planning_steps, bool) or not isinstance(planning_steps, int):
             raise TypeError("planning_steps must be an integer")
@@ -370,6 +392,7 @@ class DynaQAgent(QLearningAgent):
             raise ValueError("planning_steps must be non-negative")
         self.planning_steps = planning_steps
         self._model: dict[tuple[TabularState, int], _ModelEntry] = {}
+        self._model_keys: list[tuple[TabularState, int]] = []
 
     @property
     def model_size(self) -> int:
@@ -378,18 +401,20 @@ class DynaQAgent(QLearningAgent):
     def clear(self) -> None:
         super().clear()
         self._model.clear()
+        self._model_keys.clear()
 
     def _after_real_experience(self, experience: _Experience) -> None:
         key = (experience.state, experience.action_index)
+        if key not in self._model:
+            self._model_keys.append(key)
         self._model[key] = _ModelEntry(
             reward=experience.reward,
             next_state=experience.next_state,
             terminated=experience.terminated,
             next_actions=experience.next_actions,
         )
-        keys = tuple(sorted(self._model))
         for _ in range(self.planning_steps):
-            sampled_key = keys[int(self._rng.integers(len(keys)))]
+            sampled_key = self._model_keys[int(self._rng.integers(len(self._model_keys)))]
             state, action_index = sampled_key
             entry = self._model[sampled_key]
             self._q_update(
@@ -476,6 +501,7 @@ class DynaQAgent(QLearningAgent):
         self._q_table = q_table
         self._epsilon = epsilon
         self._model = model
+        self._model_keys = sorted(model)
         self._pending_snapshot = None
         self._pending_action = None
 

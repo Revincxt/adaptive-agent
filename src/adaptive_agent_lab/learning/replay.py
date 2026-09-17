@@ -137,25 +137,14 @@ class ReplayBuffer(Generic[StateT, ActionT]):
     def sample(self, batch_size: int) -> tuple[Transition[StateT, ActionT], ...]:
         """Return a deterministic seeded sample without replacement."""
 
-        self._validate_batch_size(batch_size)
-        logical_indices = self._rng.sample(range(self._size), batch_size)
-        sampled: list[Transition[StateT, ActionT]] = []
-        for logical_index in logical_indices:
-            storage_index = (
-                logical_index
-                if self._size < self._capacity
-                else (self._next_index + logical_index) % self._capacity
-            )
-            transition = self._storage[storage_index]
-            if transition is None:  # Defensive guard for internal invariants.
-                raise RuntimeError("replay buffer storage is inconsistent")
-            sampled.append(copy.deepcopy(transition))
-        return tuple(sampled)
+        return tuple(copy.deepcopy(item) for item in self._sample_refs(batch_size))
 
     def sample_batch(self, batch_size: int) -> ReplayBatch:
         """Sample and stack numeric transitions into homogeneous NumPy arrays."""
 
-        transitions = self.sample(batch_size)
+        # Stacking creates independent arrays, so this numeric fast path can
+        # avoid deep-copying every selected transition first.
+        transitions = self._sample_refs(batch_size)
         try:
             states = np.stack(
                 [np.asarray(item.state, dtype=np.float64) for item in transitions]
@@ -220,6 +209,24 @@ class ReplayBuffer(Generic[StateT, ActionT]):
             raise ValueError(
                 f"cannot sample {batch_size} transitions from a buffer containing {self._size}"
             )
+
+    def _sample_refs(
+        self, batch_size: int
+    ) -> tuple[Transition[StateT, ActionT], ...]:
+        self._validate_batch_size(batch_size)
+        logical_indices = self._rng.sample(range(self._size), batch_size)
+        sampled: list[Transition[StateT, ActionT]] = []
+        for logical_index in logical_indices:
+            storage_index = (
+                logical_index
+                if self._size < self._capacity
+                else (self._next_index + logical_index) % self._capacity
+            )
+            transition = self._storage[storage_index]
+            if transition is None:
+                raise RuntimeError("replay buffer storage is inconsistent")
+            sampled.append(transition)
+        return tuple(sampled)
 
 
 __all__ = ["ReplayBatch", "ReplayBuffer", "Transition"]

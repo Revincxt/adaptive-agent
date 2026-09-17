@@ -122,12 +122,13 @@ capacity, horizon, and the maximum order priority.
 `ObservationEncoder.vector` returns a flat, padded vector with size
 
 ```text
-4 * width * height + 3 + 12 * max_orders
+4 * width * height + 6 + 12 * max_orders
 ```
 
 The four flattened grid channels are permanent obstacles, charging stations,
-active dynamic blockages, and robot position. The three globals are normalized
-time, normalized battery, and a carrying flag. Each order slot has normalized
+active dynamic blockages, and robot position. The six globals are normalized
+time, normalized battery, a carrying flag, relative `x`/`y` offsets to the
+active service target, and a target-present flag. Each order slot has normalized
 pickup and drop-off coordinates (four values), release time, deadline, priority,
 and a five-way one-hot status. Unused order slots remain zero.
 
